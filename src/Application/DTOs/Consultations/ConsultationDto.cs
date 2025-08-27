@@ -1,0 +1,24 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Numerics;
+
+namespace Infrastructure.Persistence.Models;
+
+public partial class ConsultationDto
+{
+    public int ConsultationID { get; set; }
+
+    public int? DoctorID { get; set; }
+
+    public string ApplicantFileNumber { get; set; } = null!;
+
+    public string? ConsultationType { get; set; }
+
+    public string? ReferredDoctor { get; set; }
+
+    public string? Result { get; set; }
+
+    public string? Attachment { get; set; }
+
+    public virtual DoctorDto Doctor { get; set; } = null!;
+}
