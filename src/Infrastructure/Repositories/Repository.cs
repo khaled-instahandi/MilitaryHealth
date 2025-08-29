@@ -146,6 +146,8 @@ public class Repository<TEntity> : IPagedRepository<TEntity> where TEntity : cla
 
         var totalCount = await query.CountAsync(ct);
 
+        query = query.Skip((page - 1) * pageSize).Take(pageSize);
+
         List<TDto> items;
 
         if (selector != null)

@@ -18,7 +18,7 @@ namespace Api.Controllers
         {
             _mediator = mediator;
         }
-        [Authorize(Roles = "Admin")] // فقط الأدوار المحددة تستطيع عرض الصلاحيات
+        //[Authorize(Roles = "Admin")] // فقط الأدوار المحددة تستطيع عرض الصلاحيات
 
         // GET: api/Applicants
         [HttpGet]
