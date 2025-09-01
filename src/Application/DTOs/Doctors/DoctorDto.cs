@@ -2,9 +2,9 @@
 using System;
 using System.Collections.Generic;
 
-namespace Infrastructure.Persistence.Models;
+namespace Application.DTOs;
 
-public partial class DoctorDto
+public  class DoctorDto
 {
     public int DoctorID { get; set; }
 

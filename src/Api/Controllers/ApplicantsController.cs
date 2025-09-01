@@ -1,4 +1,5 @@
 ﻿
+using Application.DTOs;
 using Infrastructure.Persistence.Models;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -9,7 +10,7 @@ namespace Api.Controllers
 {
     [ApiController]
     [Route("api/Applicants")]
-    //[Authorize]
+    [Authorize(Roles = "Admin,Receptionist,Doctor,Supervisor,Diwan")]
     public class ApplicantsController : ControllerBase
     {
         private readonly IMediator _mediator;
@@ -18,7 +19,6 @@ namespace Api.Controllers
         {
             _mediator = mediator;
         }
-        [Authorize(Roles = "Admin")] // فقط الأدوار المحددة تستطيع عرض الصلاحيات
 
         // GET: api/Applicants
         [HttpGet]
@@ -51,12 +51,26 @@ namespace Api.Controllers
             var result = await _mediator.Send(query);
             return Ok(ApiResult.Ok(result, "Fetched all data!", 200, HttpContext.TraceIdentifier));
         }
+        [HttpGet("GetApplicantsStatistics")]
+        public async Task<IActionResult> GetApplicantsStatistics(CancellationToken ct)
+        {
+            var stats = await _mediator.Send(new GetApplicantsStatisticsQuery(), ct);
+
+            return Ok(new
+            {
+                succeeded = true,
+                status = 200,
+                message = "Applicants statistics fetched successfully",
+                data = stats,
+                traceId = HttpContext.TraceIdentifier
+            });
+        }
 
         // GET: api/Applicants/5
         [HttpGet("{id}")]
-        public async Task<IActionResult> Get(int id)
+        public async Task<IActionResult> Get(string id)
         {
-            var query = new GetEntityByIdQuery<Applicant, ApplicantDto>(id);
+            var query = new GetApplicantQuery(id);
             var result = await _mediator.Send(query);
 
             if (result == null)
@@ -64,7 +78,17 @@ namespace Api.Controllers
 
             return Ok(ApiResult.Ok(result, "Fetched all data!", 200, HttpContext.TraceIdentifier));
         }
+        [HttpGet("Details/{id}")]
+        public async Task<IActionResult> GetDetails(string id)
+        {
+            var query = new GetApplicantDetailsQuery(id);
+            var result = await _mediator.Send(query);
 
+            if (result == null)
+                return NotFound(ApiResult.Fail("Applicant not found", 404, traceId: HttpContext.TraceIdentifier));
+
+            return Ok(ApiResult.Ok(result, "Fetched all data!", 200, HttpContext.TraceIdentifier));
+        }
 
         // POST: api/Applicants
         [HttpPost]

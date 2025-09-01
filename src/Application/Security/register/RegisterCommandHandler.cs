@@ -39,7 +39,7 @@ public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, Re
         }
 
         // Assign default role
-        //await _userManager.AddToRoleAsync(user, "User");
+        //await _userManager.AddToRoleAsync(user, "Receptionist");
 
         // Generate JWT
         var roles = await _userManager.GetRolesAsync(user);

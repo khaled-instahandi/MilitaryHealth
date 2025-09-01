@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace Infrastructure.Persistence.Models;
+namespace Application.DTOs;
 
 public partial class ConsultationRequest
 {
@@ -14,7 +14,7 @@ public partial class ConsultationRequest
 
     public string? ReferredDoctor { get; set; }
 
-    public byte[]? Result { get; set; }
+    public string? Result { get; set; }
 
     public string? Attachment { get; set; }
 

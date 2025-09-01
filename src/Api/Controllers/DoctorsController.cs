@@ -1,4 +1,5 @@
 ﻿
+using Application.DTOs;
 using Infrastructure.Persistence.Models;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -9,7 +10,7 @@ namespace Api.Controllers
 {
     [ApiController]
     [Route("api/Doctors")]
-    //[Authorize]
+    [Authorize(Roles = "Admin,Receptionist,Doctor,Supervisor,Diwan")]
     public class DoctorsController : ControllerBase
     {
         private readonly IMediator _mediator;
@@ -18,7 +19,6 @@ namespace Api.Controllers
         {
             _mediator = mediator;
         }
-        [Authorize(Roles = "Admin")] // فقط الأدوار المحددة تستطيع عرض الصلاحيات
 
         // GET: api/Doctors
         [HttpGet]
@@ -66,26 +66,20 @@ namespace Api.Controllers
         }
 
 
-        // POST: api/Doctors
         [HttpPost]
-        public async Task<IActionResult> Post([FromBody] DoctorRequest dto)
+        public async Task<IActionResult> CreateDoctor([FromBody] DoctorRequest request, CancellationToken ct)
         {
-            if (!ModelState.IsValid)
+            var doctor = await _mediator.Send(new CreateDoctorCommand(request), ct);
+
+            return Ok(new
             {
-                var errors = ModelState
-                    .Where(x => x.Value?.Errors.Count > 0)
-                    .ToDictionary(
-                        kvp => kvp.Key,
-                        kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToArray()
-                    );
-
-                return BadRequest(ApiResult.Fail("Validation errors", 400, errors, HttpContext.TraceIdentifier));
-            }
-            var command = new CreateEntityCommand<Doctor, DoctorRequest>(dto);
-            var result = await _mediator.Send(command);
-            return Ok(ApiResult.Ok(result, "Entity created successfully!", 200, HttpContext.TraceIdentifier));
+                succeeded = true,
+                status = 200,
+                message = "Doctor created successfully",
+                data = doctor,
+                traceId = HttpContext.TraceIdentifier
+            });
         }
-
         // PUT: api/Doctors/5
         [HttpPut("{id}")]
         public async Task<IActionResult> Put(int id, [FromBody] DoctorRequest dto)

@@ -59,6 +59,8 @@ public partial class User
 
     public virtual ICollection<AspNetUserToken> AspNetUserTokens { get; set; } = new List<AspNetUserToken>();
 
+    public virtual Doctor? Doctor { get; set; }
+
     public virtual ICollection<UserRefreshToken> UserRefreshTokens { get; set; } = new List<UserRefreshToken>();
 
     public virtual ICollection<AspNetRole> Roles { get; set; } = new List<AspNetRole>();

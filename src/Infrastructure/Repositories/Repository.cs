@@ -4,6 +4,7 @@ using Infrastructure.Persistence.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Security.Claims;
 using System.Text.Json;
 
@@ -85,6 +86,7 @@ public class Repository<TEntity> : IPagedRepository<TEntity> where TEntity : cla
 
     public async Task AddAsync(TEntity entity, CancellationToken ct = default)
     {
+        
         await _set.AddAsync(entity, ct);
         await LogAuditAsync(entity, "Create");
         await _db.SaveChangesAsync(ct);
@@ -92,24 +94,55 @@ public class Repository<TEntity> : IPagedRepository<TEntity> where TEntity : cla
 
     public async Task UpdateAsync(TEntity entity, CancellationToken ct = default)
     {
-        var keyProperty = _db.Model.FindEntityType(typeof(TEntity))?.FindPrimaryKey()?.Properties.FirstOrDefault();
-        if (keyProperty == null)
-            throw new InvalidOperationException("Entity has no primary key defined.");
+        var entityType = _db.Model.FindEntityType(typeof(TEntity));
+        if (entityType == null)
+            throw new InvalidOperationException($"EF model does not contain entity {typeof(TEntity).Name}.");
 
-        var keyValue = _db.Entry(entity).Property(keyProperty.Name).CurrentValue;
-        if (keyValue == null)
-            throw new InvalidOperationException("Entity key value is null.");
+        var keyProps = entityType.FindPrimaryKey()?.Properties;
+        if (keyProps == null || keyProps.Count == 0)
+            throw new InvalidOperationException($"Entity {typeof(TEntity).Name} has no primary key defined.");
 
-        // اجلب الـ oldEntity من قاعدة البيانات باستخدام FindAsync (أفضل من استخدام LINQ مع _db.Entry)
-        var oldEntity = await _set.FindAsync(new object[] { keyValue }, ct);
+        var keyValues = new object[keyProps.Count];
+        for (int i = 0; i < keyProps.Count; i++)
+        {
+            var propName = keyProps[i].Name;
 
+            object? val = null;
+            try
+            {
+                val = _db.Entry(entity).Property(propName).CurrentValue;
+            }
+            catch
+            {
+            }
+
+            if (val == null)
+            {
+                var clrProp = typeof(TEntity).GetProperty(propName);
+                if (clrProp != null)
+                    val = clrProp.GetValue(entity);
+            }
+
+            if (val == null)
+                throw new InvalidOperationException($"Key property '{propName}' value is null for entity {typeof(TEntity).Name}.");
+
+            keyValues[i] = val;
+        }
+
+        var oldEntity = await _set.FindAsync(keyValues, ct);
         if (oldEntity == null)
             throw new InvalidOperationException("Entity not found in database.");
 
-        _set.Update(entity);
-        await LogAuditAsync(entity, "Update", oldEntity);
+        var oldSnapshot = _db.Entry(oldEntity).CurrentValues.ToObject() as TEntity
+                          ?? throw new InvalidOperationException("Failed to capture old entity values.");
+
+        _db.Entry(oldEntity).CurrentValues.SetValues(entity);
+
+        await LogAuditAsync(oldEntity, "Update", oldSnapshot);
+
         await _db.SaveChangesAsync(ct);
     }
+
 
     public async Task DeleteAsync(TEntity entity, CancellationToken ct = default)
     {
@@ -120,18 +153,168 @@ public class Repository<TEntity> : IPagedRepository<TEntity> where TEntity : cla
 
     public IQueryable<TEntity> Query() => _set.AsNoTracking();
 
+
     public async Task<TEntity?> GetByIdAsync(object id, CancellationToken ct = default)
-        => await _set.FindAsync(new object[] { id }, ct);
+    {
+        var entityType = _db.Model.FindEntityType(typeof(TEntity));
+        if (entityType == null)
+            throw new InvalidOperationException($"EF model does not contain entity {typeof(TEntity).Name}.");
+
+        var keyProperties = entityType.FindPrimaryKey()?.Properties;
+        if (keyProperties == null || keyProperties.Count == 0)
+            throw new InvalidOperationException($"Entity {typeof(TEntity).Name} has no primary key defined.");
+
+        if (keyProperties.Count == 1)
+        {
+            return await _set.FindAsync(new object[] { id }, ct);
+        }
+
+        if (id is object[] keys && keys.Length == keyProperties.Count)
+        {
+            return await _set.FindAsync(keys, ct);
+        }
+
+        var candidates = new[]
+        {
+        $"{typeof(TEntity).Name}ID",
+        $"{typeof(TEntity).Name}Id",
+        "Id",
+        "ID"
+    };
+
+        var candidateKey = keyProperties
+            .FirstOrDefault(k => candidates.Any(c => string.Equals(k.Name, c, StringComparison.OrdinalIgnoreCase)))
+            ?? keyProperties.FirstOrDefault(k => string.Equals(k.Name, $"{typeof(TEntity).Name}ID", StringComparison.OrdinalIgnoreCase));
+
+        if (candidateKey != null)
+        {
+            var targetType = candidateKey.ClrType;
+            object? converted;
+            try
+            {
+                if (targetType == typeof(Guid))
+                {
+                    converted = Guid.TryParse(id?.ToString(), out var g) ? g : throw new ArgumentException("Invalid Guid value.");
+                }
+                else if (targetType.IsEnum)
+                {
+                    converted = Enum.Parse(targetType, id!.ToString()!, ignoreCase: true);
+                }
+                else
+                {
+                    converted = Convert.ChangeType(id, targetType);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new ArgumentException($"Unable to convert id to key type {targetType.Name}: {ex.Message}", ex);
+            }
+
+            var param = Expression.Parameter(typeof(TEntity), "e");
+            var efPropertyMethod = typeof(EF).GetMethod("Property", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!.MakeGenericMethod(targetType);
+            var propertyAccess = Expression.Call(efPropertyMethod, param, Expression.Constant(candidateKey.Name));
+            var constant = Expression.Constant(converted, targetType);
+            var body = Expression.Equal(propertyAccess, constant);
+            var lambda = Expression.Lambda<Func<TEntity, bool>>(body, param);
+
+            return await _set.AsNoTracking().FirstOrDefaultAsync(lambda, ct);
+        }
+
+        throw new ArgumentException($"Entity {typeof(TEntity).Name} has a composite key of {keyProperties.Count} values. Pass an object[] with the correct number of key values or provide a matching single key property (e.g. {typeof(TEntity).Name}ID).");
+    }
+
+    private static Expression<Func< TEntity, bool>>? BuildFilter(Dictionary<string, string>? filters)
+    {
+        if (filters == null || !filters.Any())
+            return null;
+
+        ParameterExpression param = Expression.Parameter(typeof(TEntity), "e");
+        Expression? body = null;
+
+        foreach (var kvp in filters)
+        {
+            string key = kvp.Key;
+            string value = kvp.Value;
+
+            // تمييز بين Min[Field] / Max[Field] / From[Field] / To[Field]
+            string fieldName = key;
+            string mode = "eq";
+
+            if (key.StartsWith("Min["))
+            {
+                fieldName = key[4..^1];
+                mode = "min";
+            }
+            else if (key.StartsWith("Max["))
+            {
+                fieldName = key[4..^1];
+                mode = "max";
+            }
+            else if (key.StartsWith("From["))
+            {
+                fieldName = key[5..^1];
+                mode = "from";
+            }
+            else if (key.StartsWith("To["))
+            {
+                fieldName = key[3..^1];
+                mode = "to";
+            }
+
+            var prop = typeof(TEntity).GetProperty(fieldName, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
+            if (prop == null) continue;
+
+            var left = Expression.Property(param, prop);
+            Expression? condition = null;
+
+            // محاولة تحويل value إلى نوع الحقل
+            object? typedValue = Convert.ChangeType(value, Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType);
+
+            var right = Expression.Constant(typedValue);
+
+            switch (mode)
+            {
+                case "eq":
+                    if (prop.PropertyType == typeof(string))
+                    {
+                        // e.FullName.Contains(value)
+                        var containsMethod = typeof(string).GetMethod("Contains", new[] { typeof(string) });
+                        condition = Expression.Call(left, containsMethod!, right);
+                    }
+                    else
+                    {
+                        condition = Expression.Equal(left, right);
+                    }
+                    break;
+
+                case "min":
+                case "from":
+                    condition = Expression.GreaterThanOrEqual(left, right);
+                    break;
+
+                case "max":
+                case "to":
+                    condition = Expression.LessThanOrEqual(left, right);
+                    break;
+            }
+
+            body = body == null ? condition : Expression.AndAlso(body, condition);
+        }
+
+        if (body == null) return null;
+
+        return Expression.Lambda<Func<TEntity, bool>>(body, param);
+    }
 
     public async Task<PagedResult<TDto>> GetPagedAsync<TDto>(
-        Expression<Func<TEntity, bool>>? filter,
-        Expression<Func<TEntity, TDto>>? selector,
-        string? sortBy,
-        bool sortDesc,
-        int page,
-        int pageSize,
-        CancellationToken ct = default,
-        params Expression<Func<TEntity, object>>[] includes)
+            Expression<Func<TEntity, bool>>? filter,
+            Expression<Func<TEntity, TDto>>? selector,
+            string? sortBy,
+            bool sortDesc,
+            int page,
+            int pageSize,
+            CancellationToken ct = default,
+            params Expression<Func<TEntity, object>>[] includes)
     {
         IQueryable<TEntity> query = _set;
 
@@ -145,6 +328,7 @@ public class Repository<TEntity> : IPagedRepository<TEntity> where TEntity : cla
             query = query.OrderByProperty(sortBy, sortDesc);
 
         var totalCount = await query.CountAsync(ct);
+        query = query.Skip((page - 1) * pageSize).Take(pageSize);
 
         List<TDto> items;
 
@@ -160,5 +344,32 @@ public class Repository<TEntity> : IPagedRepository<TEntity> where TEntity : cla
             Page = page,
             PageSize = pageSize
         };
+    }
+
+    public async Task<TEntity?> GetByFileNumberAsync(object id, CancellationToken ct = default)
+    {
+        if (id == null) return default;
+
+        var fileNumber = id.ToString();
+        if (string.IsNullOrWhiteSpace(fileNumber)) return default;
+
+        var prop = typeof(TEntity).GetProperty("ApplicantFileNumber")
+                ?? typeof(TEntity).GetProperty("FileNumber");
+
+        if (prop == null)
+        {
+            return default;
+        }
+
+
+        return await _set.AsNoTracking()
+            .FirstOrDefaultAsync(e => EF.Property<string>(e, prop.Name) == fileNumber, ct);
+    }
+    public async Task<TEntity?> GetByFileNumberAsync(string fileNumber, CancellationToken ct = default)
+    {
+       
+        return await _set
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => EF.Property<string>(e, "ApplicantFileNumber") == fileNumber, ct);
     }
 }

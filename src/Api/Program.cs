@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using System.Text;
@@ -160,8 +161,12 @@ void RegisterGenericHandlers(IServiceCollection services)
         .ToArray();
 
     var dtoTypes = allTypes
-        .Where(t => t.IsClass && !t.IsAbstract && t.Name.EndsWith("Dto"))
-        .ToArray();
+      .Where(t => t.IsClass && !t.IsAbstract &&
+                  t.Namespace != null &&
+                  t.Namespace.Contains("Application.DTOs")) 
+      .ToArray();
+
+
 
     var requestTypes = allTypes
         .Where(t => t.IsClass && !t.IsAbstract && t.Name.EndsWith("Request"))
@@ -220,65 +225,12 @@ void RegisterGenericHandlers(IServiceCollection services)
 RegisterGenericHandlers(builder.Services);
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IDoctorQueryService, DoctorQueryService>();
 
-//builder.Services.AddScoped(typeof(IPagedRepository<>), typeof(Repository<>));
-//builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
-//builder.Services.AddScoped<IServiceScopeFactory, IServiceScopeFactory>();
+builder.Services.AddScoped<IDoctorService, DoctorService>();
 
-//// Specific Command Handlers for Applicant
-//builder.Services.AddTransient<IRequestHandler<CreateEntityCommand<Applicant, ApplicantRequest>, ApplicantRequest>,
-//                             GenericCommandHandler<Applicant, ApplicantRequest>>();
-
-//builder.Services.AddTransient<IRequestHandler<UpdateEntityCommand<Applicant, ApplicantRequest>, ApplicantRequest>,
-//                             GenericCommandHandler<Applicant, ApplicantRequest>>();
-
-//builder.Services.AddTransient<IRequestHandler<DeleteEntityCommand<Applicant>, bool>,
-//                             GenericCommandHandler<Applicant, ApplicantRequest>>();
-
-//// Specific Query Handlers for Applicant
-//builder.Services.AddTransient<IRequestHandler<GetEntitiesQuery<Applicant, ApplicantDto>, PagedResult<ApplicantDto>>,
-//                             GenericQueryHandler<Applicant, ApplicantDto>>();
-
-//builder.Services.AddTransient<IRequestHandler<GetEntityByIdQuery<Applicant, ApplicantDto>, ApplicantDto?>,
-//                             GenericQueryHandler<Applicant, ApplicantDto>>();
-
-
-
-//// Specific Command Handlers for Doctor
-//builder.Services.AddTransient<IRequestHandler<CreateEntityCommand<Doctor, DoctorRequest>, DoctorRequest>,
-//                             GenericCommandHandler<Doctor, DoctorRequest>>();
-
-//builder.Services.AddTransient<IRequestHandler<UpdateEntityCommand<Doctor, DoctorRequest>, DoctorRequest>,
-//                             GenericCommandHandler<Doctor, DoctorRequest>>();
-
-//builder.Services.AddTransient<IRequestHandler<DeleteEntityCommand<Doctor>, bool>,
-//                             GenericCommandHandler<Doctor, DoctorRequest>>();
-
-//// Specific Query Handlers for Doctor
-//builder.Services.AddTransient<IRequestHandler<GetEntitiesQuery<Doctor, DoctorDto>, PagedResult<DoctorDto>>,
-//                             GenericQueryHandler<Doctor, DoctorDto>>();
-
-//builder.Services.AddTransient<IRequestHandler<GetEntityByIdQuery<Doctor, DoctorDto>, DoctorDto?>,
-//                             GenericQueryHandler<Doctor, DoctorDto>>();
-
-
-//// Specific Command Handlers for User
-//builder.Services.AddTransient<IRequestHandler<CreateEntityCommand<User, UserRequest>, UserRequest>,
-//                             GenericCommandHandler<User, UserRequest>>();
-
-//builder.Services.AddTransient<IRequestHandler<UpdateEntityCommand<User, UserRequest>, UserRequest>,
-//                             GenericCommandHandler<User, UserRequest>>();
-
-//builder.Services.AddTransient<IRequestHandler<DeleteEntityCommand<User>, bool>,
-//                             GenericCommandHandler<User, UserRequest>>();
-
-//// Specific Query Handlers for User
-//builder.Services.AddTransient<IRequestHandler<GetEntitiesQuery<User, UserDto>, PagedResult<UserDto>>,
-//                             GenericQueryHandler<User, UserDto>>();
-
-//builder.Services.AddTransient<IRequestHandler<GetEntityByIdQuery<User, UserDto>, UserDto?>,
-//                             GenericQueryHandler<User, UserDto>>();
-
+builder.Services.AddScoped<IApplicantService, ApplicantService>();
+builder.Services.AddScoped<IArchiveService, ArchiveService>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(o =>
@@ -300,8 +252,20 @@ using (var scope = app.Services.CreateScope())
 // Middleware & Logging
 app.UseSerilogRequestLogging();
 builder.Services.AddLogging();
+app.UseStaticFiles(); // هذا لــ wwwroot
 
-
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(builder.Environment.ContentRootPath, "Files")),
+    RequestPath = "/Files"
+});
+app.UseDirectoryBrowser(new DirectoryBrowserOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(builder.Environment.ContentRootPath, "Files")),
+    RequestPath = "/Files"
+});
 app.UseSwagger();
 app.UseSwaggerUI();
 
@@ -336,7 +300,7 @@ app.MapControllers();
 app.Run();
 static async Task SeedRoles(RoleManager<IdentityRole<int>> roleManager)
 {
-    var roles = new[] { "Admin", "Supervisor", "Doctor", "Receptionist" };
+    var roles = new[] { "Admin", "Supervisor", "Doctor", "Receptionist" , "Diwan" };
 
     foreach (var role in roles)
     {

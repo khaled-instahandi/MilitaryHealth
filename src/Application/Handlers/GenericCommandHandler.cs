@@ -1,6 +1,7 @@
 ﻿using MapsterMapper;
 using MediatR;
 using Application.Abstractions;
+using Application.DTOs;
 
 public class GenericCommandHandler<TEntity, TDto> :
     IRequestHandler<CreateEntityCommand<TEntity, TDto>, TDto>,
@@ -9,36 +10,75 @@ public class GenericCommandHandler<TEntity, TDto> :
     where TEntity : class
 {
     private readonly IRepository<TEntity> _repo;
+    private readonly IArchiveService _repoArch;
+
     private readonly IMapper _mapper;
     private readonly IFileNumberGenerator<TEntity>? _fileNumberGenerator;
 
     public GenericCommandHandler(
         IRepository<TEntity> repo,
+        IArchiveService repoArch,
         IMapper mapper,
         IFileNumberGenerator<TEntity>? fileNumberGenerator = null)
     {
         _repo = repo;
         _mapper = mapper;
+        _repoArch = repoArch;
         _fileNumberGenerator = fileNumberGenerator;
     }
 
     public async Task<TDto> Handle(CreateEntityCommand<TEntity, TDto> request, CancellationToken ct)
     {
-        var entity = _mapper.Map<TEntity>(request.Dto);
+        var entity = _mapper.Map<TEntity>(request.Dto)
+            ?? throw new InvalidOperationException("Mapping produced null entity.");
 
-        // توليد FileNumber إذا موجود
-        if (entity.GetType().Name.Contains("Applicant") && _fileNumberGenerator != null)
+        if (typeof(TEntity).Name.Contains("Applicant") && _fileNumberGenerator != null)
         {
-            var prop = typeof(TEntity).GetProperty("FileNumber");
-            if (prop != null && prop.CanWrite)
+            var fileProp = typeof(TEntity).GetProperty("FileNumber");
+            if (fileProp != null && fileProp.CanWrite && fileProp.PropertyType == typeof(string))
             {
                 var fileNumber = await _fileNumberGenerator.GenerateNextAsync(ct);
-                prop.SetValue(entity, fileNumber);
+                fileProp.SetValue(entity, fileNumber);
+            }
+
+            var createdAtProp = typeof(TEntity).GetProperty("CreatedAt");
+            if (createdAtProp != null && createdAtProp.CanWrite &&
+                (createdAtProp.PropertyType == typeof(DateTime) || createdAtProp.PropertyType == typeof(DateTime?)))
+            {
+                createdAtProp.SetValue(entity, DateTime.UtcNow);
             }
         }
 
-       
+        if (typeof(TEntity).Name.Contains("FinalDecision") 
+            || typeof(TEntity).Name.Contains("SurgicalExam")
+            || typeof(TEntity).Name.Contains("OrthopedicExam")
+            || typeof(TEntity).Name.Contains("InternalExam")
+            || typeof(TEntity).Name.Contains("EyeExam")
+            )
+        {
+            var applicantFileProp = typeof(TEntity).GetProperty("ApplicantFileNumber");
+            if (applicantFileProp != null && applicantFileProp.PropertyType == typeof(string))
+            {
+                var applicantFileNumber = applicantFileProp.GetValue(entity) as string;
+                if (!string.IsNullOrWhiteSpace(applicantFileNumber))
+                {
+                    var existing = await _repo.GetByFileNumberAsync(applicantFileNumber, ct);
+                    if (existing != null)
+                    {
+                        throw new InvalidOperationException("Applicant already registered before.");
+                    }
+                }
+            }
+        }
+
+
         await _repo.AddAsync(entity, ct);
+        if (typeof(TEntity).Name.Contains("FinalDecision"))
+        {
+            var finalDecisionDto = _mapper.Map<FinalDecisionDto>(entity);
+            await _repoArch.ArchiveFinalDecisionAsync(finalDecisionDto, ct);
+        }
+
         return _mapper.Map<TDto>(entity);
     }
 

@@ -1,5 +1,6 @@
 ﻿// Application/DTOs/Applicants/ApplicantDto.cs
 using System.ComponentModel.DataAnnotations;
+namespace Application.DTOs;
 
 public class ApplicantDto
 {
@@ -34,6 +35,8 @@ public class ApplicantDto
     public bool? Tattoo { get; set; }
 
     public string? DistinctiveMarks { get; set; }
+    public DateTime? CreatedAt { get; set; }
+
     public MaritalStatusDto? MaritalStatus { get; set; }
 
 

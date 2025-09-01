@@ -1,9 +1,16 @@
-﻿namespace Application.DTOs.Auth;
+﻿using Application.DTOs.Users;
 
-public sealed class LoginResponse
+namespace Application.DTOs.Auth;
+
+public class LoginResponse
 {
-    public string AccessToken { get; set; } = default!;
-    public string RefreshToken { get; set; } = default!;
+    public UserDto? User { get; set; }
+    public DoctorDto Doctor { get; set; }
+    public IEnumerable<string> Roles { get; set; } = new List<string>();
+
+    public string AccessToken { get; set; } = null!;
+    public string RefreshToken { get; set; } = null!;
+
     public DateTime AccessTokenExpires { get; set; }
     public DateTime RefreshTokenExpires { get; set; }
 }

@@ -12,5 +12,6 @@ namespace Application.DTOs.Doctors
 
         public string Description { get; set; } = null!;
 
+       
     }
 }

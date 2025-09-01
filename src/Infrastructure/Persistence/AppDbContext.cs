@@ -60,6 +60,8 @@ public partial class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.UseCollation("Arabic_CI_AS");
+
         modelBuilder.Entity<Applicant>(entity =>
         {
             entity.HasKey(e => e.ApplicantID).HasName("PK__Applican__39AE9148E8810501");
@@ -70,6 +72,7 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.BloodPressure)
                 .HasMaxLength(20)
                 .IsUnicode(false);
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
             entity.Property(e => e.DistinctiveMarks).HasColumnType("text");
             entity.Property(e => e.FileNumber)
                 .HasMaxLength(50)
@@ -90,22 +93,29 @@ public partial class AppDbContext : DbContext
 
         modelBuilder.Entity<Archive>(entity =>
         {
-            entity.HasKey(e => e.ArchiveID).HasName("PK__Archive__33A73E7702D57F28");
+            entity.HasKey(e => new { e.ArchiveID, e.ApplicantID, e.DecisionID }).HasName("PK_Archive_1");
 
             entity.ToTable("Archive");
 
+            entity.Property(e => e.ArchiveID).ValueGeneratedOnAdd();
             entity.Property(e => e.ApplicantFileNumber)
                 .HasMaxLength(50)
                 .IsUnicode(false);
-            entity.Property(e => e.DigitalCopy)
-                .HasMaxLength(255)
-                .IsUnicode(false);
+            entity.Property(e => e.ArchiveDate).HasColumnType("datetime");
+            entity.Property(e => e.DigitalCopy).IsUnicode(false);
             entity.Property(e => e.FileNumber)
                 .HasMaxLength(50)
                 .IsUnicode(false);
 
-            entity.HasOne(d => d.Applicant).WithMany(p => p.Archives)
+            entity.HasOne(d => d.ApplicantFileNumberNavigation).WithMany(p => p.ArchiveApplicantFileNumberNavigations)
+                .HasPrincipalKey(p => p.FileNumber)
+                .HasForeignKey(d => d.ApplicantFileNumber)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Archive_Applicants");
+
+            entity.HasOne(d => d.Applicant).WithMany(p => p.ArchiveApplicants)
                 .HasForeignKey(d => d.ApplicantID)
+                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__Archive__Applica__6A30C649");
         });
 
@@ -530,6 +540,10 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Username)
                 .HasMaxLength(50)
                 .IsUnicode(false);
+
+            entity.HasOne(d => d.Doctor).WithMany(p => p.Users)
+                .HasForeignKey(d => d.DoctorID)
+                .HasConstraintName("FK_Users_Doctors");
 
             entity.HasMany(d => d.Roles).WithMany(p => p.Users)
                 .UsingEntity<Dictionary<string, object>>(

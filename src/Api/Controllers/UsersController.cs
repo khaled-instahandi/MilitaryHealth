@@ -10,7 +10,7 @@ namespace Api.Controllers
 {
     [ApiController]
     [Route("api/UsersController")]
-    //[Authorize]
+    [Authorize(Roles = "Admin,Receptionist,Doctor,Supervisor,Diwan")]
     public class UsersController : ControllerBase
     {
         private readonly IMediator _mediator;
@@ -19,7 +19,6 @@ namespace Api.Controllers
         {
             _mediator = mediator;
         }
-        [Authorize(Roles = "Admin")] // فقط الأدوار المحددة تستطيع عرض الصلاحيات
 
         // GET: api/Users
         [HttpGet]
@@ -45,7 +44,7 @@ namespace Api.Controllers
                 page,
                 pageSize
                 ,
-                    new Expression<Func<User, object>>[] {  }
+                    new Expression<Func<User, object>>[] {e=>e.Doctor }
 
             );
 

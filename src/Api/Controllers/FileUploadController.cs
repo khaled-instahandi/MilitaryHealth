@@ -1,4 +1,5 @@
 ﻿using Api.Abstractions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -8,6 +9,8 @@ using System.Threading.Tasks;
 
 [Route("api/[controller]")]
 [ApiController]
+[AllowAnonymous]
+
 public class FileUploadController : ControllerBase
 {
     private readonly ILogger<FileUploadController> _logger;

@@ -9,6 +9,11 @@
     <PackageReference Include="Mapster" Version="7.4.0" />
     <PackageReference Include="MediatR" Version="13.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Identity" Version="2.3.1" />
+    <PackageReference Include="Microsoft.VisualStudio.Text.UI" Version="17.14.249" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Handlers\FinalDecisions\" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -1,4 +1,5 @@
 ﻿
+using Application.DTOs;
 using Infrastructure.Persistence.Models;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -9,6 +10,7 @@ namespace Api.Controllers
 {
     [ApiController]
     [Route("api/MaritalStatuses")]
+    [AllowAnonymous]
     //[Authorize]
     public class MaritalStatusesController : ControllerBase
     {
@@ -18,7 +20,6 @@ namespace Api.Controllers
         {
             _mediator = mediator;
         }
-        [Authorize(Roles = "Admin")] // فقط الأدوار المحددة تستطيع عرض الصلاحيات
 
         // GET: api/Applicants
         [HttpGet]

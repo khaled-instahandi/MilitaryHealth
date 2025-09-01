@@ -1,8 +1,11 @@
 ﻿// Application/DTOs/Applicants/ApplicantDto.cs
+using Application.DTOs;
 using System.ComponentModel.DataAnnotations;
 
 public class ApplicantRequest
 {
+    public int? ApplicantID { get; set; }
+
     [Required(ErrorMessage = "FullName is required")]
 
     public string FullName { get; set; } = null!;

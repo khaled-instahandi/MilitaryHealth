@@ -35,14 +35,14 @@ namespace Infrastructure.Services
             foreach (var r in roles)
                 claims.Add(new Claim(ClaimTypes.Role, r));
 
-            var accessTokenExpiryMinutes = int.Parse(_config["Jwt:AccessTokenExpiryMinutes"] ?? "15");
+            var accessTokenExpiryDays = int.Parse(_config["Jwt:AccessTokenExpiryDays"] ?? "3");
             var refreshTokenExpiryDays = int.Parse(_config["Jwt:RefreshTokenExpiryDays"] ?? "7");
 
             var accessToken = new JwtSecurityToken(
                 issuer: _config["Jwt:Issuer"],
                 audience: _config["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(accessTokenExpiryMinutes),
+                expires: DateTime.UtcNow.AddDays(accessTokenExpiryDays),
                 signingCredentials: creds
             );
 

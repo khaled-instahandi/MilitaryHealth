@@ -1,4 +1,5 @@
 ﻿
+using Application.DTOs;
 using Infrastructure.Persistence.Models;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -9,7 +10,7 @@ namespace Api.Controllers
 {
     [ApiController]
     [Route("api/FinalDecisions")]
-    //[Authorize]
+    [Authorize(Roles = "Admin,Receptionist,Doctor,Supervisor,Diwan")]
     public class FinalDecisionsController : ControllerBase
     {
         private readonly IMediator _mediator;
@@ -18,7 +19,6 @@ namespace Api.Controllers
         {
             _mediator = mediator;
         }
-        [Authorize(Roles = "Admin")] // فقط الأدوار المحددة تستطيع عرض الصلاحيات
 
         // GET: api/Doctors
         [HttpGet]
@@ -52,11 +52,10 @@ namespace Api.Controllers
             return Ok(ApiResult.Ok(result, "Fetched all data!", 200, HttpContext.TraceIdentifier));
         }
 
-        // GET: api/EyeExams/5
         [HttpGet("{id}")]
         public async Task<IActionResult> Get(int id)
         {
-            var query = new GetEntityByIdQuery<OrthopedicExam, OrthopedicExamDto>(id);
+            var query = new GetEntityByIdQuery<FinalDecision, FinalDecisionDto>(id);
             var result = await _mediator.Send(query);
 
             if (result == null)
@@ -66,9 +65,8 @@ namespace Api.Controllers
         }
 
 
-        // POST: api/Doctors
         [HttpPost]
-        public async Task<IActionResult> Post([FromBody] OrthopedicExamRequest dto)
+        public async Task<IActionResult> Post([FromBody] FinalDecisionRequest dto)
         {
             if (!ModelState.IsValid)
             {
@@ -81,14 +79,14 @@ namespace Api.Controllers
 
                 return BadRequest(ApiResult.Fail("Validation errors", 400, errors, HttpContext.TraceIdentifier));
             }
-            var command = new CreateEntityCommand<OrthopedicExam, OrthopedicExamRequest>(dto);
+            var command = new CreateEntityCommand<FinalDecision, FinalDecisionRequest>(dto);
             var result = await _mediator.Send(command);
             return Ok(ApiResult.Ok(result, "Entity created successfully!", 200, HttpContext.TraceIdentifier));
         }
 
         // PUT: api/Doctors/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> Put(int id, [FromBody] OrthopedicExamRequest dto)
+        public async Task<IActionResult> Put(int id, [FromBody] FinalDecisionRequest dto)
         {
             if (!ModelState.IsValid)
             {
@@ -101,7 +99,7 @@ namespace Api.Controllers
 
                 return BadRequest(ApiResult.Fail("Validation errors", 400, errors, HttpContext.TraceIdentifier));
             }
-            var command = new UpdateEntityCommand<OrthopedicExam, OrthopedicExamRequest>(id, dto);
+            var command = new UpdateEntityCommand<FinalDecision, FinalDecisionRequest>(id, dto);
             var result = await _mediator.Send(command);
 
             return Ok(ApiResult.Ok(result, "Entity updated successfully!", 200, HttpContext.TraceIdentifier));
@@ -112,7 +110,7 @@ namespace Api.Controllers
         public async Task<IActionResult> Delete(int id)
         {
 
-            var command = new DeleteEntityCommand<OrthopedicExam>(id);
+            var command = new DeleteEntityCommand<FinalDecision>(id);
             var success = await _mediator.Send(command);
             if (!success)
                 return NotFound(ApiResult.Fail("Entity not found", 404, null, HttpContext.TraceIdentifier));

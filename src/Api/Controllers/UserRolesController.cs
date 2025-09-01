@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/UserRoles")]
-//[Authorize(Roles = "Admin")] // فقط المدير العام يمكنه إدارة الأدوار
+[Authorize(Roles = "Admin,Receptionist,Doctor,Supervisor,Diwan")]
 public class UserRolesController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
@@ -35,7 +35,6 @@ public class UserRolesController : ControllerBase
 
         return Ok(ApiResult.Ok(true, $"Role '{role}' added to user.", 200, HttpContext.TraceIdentifier));
     }
-    [AllowAnonymous]
 
     // إزالة دور من مستخدم
     [HttpDelete("{userId}/roles/{role}")]
@@ -50,7 +49,6 @@ public class UserRolesController : ControllerBase
 
         return Ok(ApiResult.Ok(true, $"Role '{role}' removed from user.", 200, HttpContext.TraceIdentifier));
     }
-    [AllowAnonymous]
 
 
     // استعراض كل أدوار المستخدم
@@ -64,9 +62,7 @@ public class UserRolesController : ControllerBase
         return Ok(ApiResult.Ok(roles, "User roles fetched", 200, HttpContext.TraceIdentifier));
     }
     // GET: api/FieldPermissions/Al
-    [AllowAnonymous]
     [HttpGet("getAll")]
-    [Authorize(Roles = "Admin")] // فقط الأدمن يقدر يشوف الصلاحيات
     public IActionResult GetAllRoles()
     {
         var roles = _roleManager.Roles.Select(r => r.Name).ToList();

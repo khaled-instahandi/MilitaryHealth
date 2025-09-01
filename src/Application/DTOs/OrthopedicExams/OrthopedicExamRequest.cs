@@ -2,9 +2,9 @@
 using System;
 using System.Collections.Generic;
 
-namespace Infrastructure.Persistence.Models;
+namespace Application.DTOs;
 
-public  class OrthopedicExamRequest
+public class OrthopedicExamRequest
 {
 
 

@@ -29,7 +29,11 @@ public partial class Applicant
 
     public string? DistinctiveMarks { get; set; }
 
-    public virtual ICollection<Archive> Archives { get; set; } = new List<Archive>();
+    public DateTime? CreatedAt { get; set; }
+
+    public virtual ICollection<Archive> ArchiveApplicantFileNumberNavigations { get; set; } = new List<Archive>();
+
+    public virtual ICollection<Archive> ArchiveApplicants { get; set; } = new List<Archive>();
 
     public virtual MaritalStatus? MaritalStatus { get; set; }
 }

@@ -1,4 +1,5 @@
 ﻿
+using Application.DTOs;
 using Infrastructure.Persistence.Models;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -9,7 +10,8 @@ namespace Api.Controllers
 {
     [ApiController]
     [Route("api/Specializations")]
-    //[Authorize]
+    [AllowAnonymous]
+
     public class SpecializationsController : ControllerBase
     {
         private readonly IMediator _mediator;
@@ -18,7 +20,6 @@ namespace Api.Controllers
         {
             _mediator = mediator;
         }
-        [Authorize(Roles = "Admin")] // فقط الأدوار المحددة تستطيع عرض الصلاحيات
 
         // GET: api/Applicants
         [HttpGet]

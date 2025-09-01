@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Numerics;
 
-namespace Infrastructure.Persistence.Models;
+namespace Application.DTOs;
 
 public partial class ConsultationDto
 {
